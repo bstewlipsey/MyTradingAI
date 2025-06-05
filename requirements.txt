@@ -1,0 +1,9 @@
+requests
+pandas
+python-dotenv
+newsapi-python
+alpaca-trade-api
+google-generativeai
+yfinance
+pandas_ta 
+

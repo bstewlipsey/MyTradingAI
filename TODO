@@ -1,0 +1,189 @@
+# Agentic Trading AI: Step-by-Step Guide
+
+## Goal
+Create an automatic trading AI that:
+- Uses news, historical data, and Gemini's insights
+- Learns from its performance
+- Respects API quotas
+
+---
+
+## Assumptions
+- You know basic Python and how to run scripts (Copilot can help)
+- You use a text editor (VS Code recommended) with Copilot
+- You're open to learning Python concepts as needed
+
+---
+
+## Phase 1: Setup & Foundations
+
+### 1. Set Up Your Development Environment
+
+- **Install Python:**  
+  - Download from [python.org/downloads](https://python.org/downloads/)
+  - On Windows, check "Add Python to PATH" during install
+
+- **Install VS Code:**  
+  - Download from [code.visualstudio.com](https://code.visualstudio.com/)
+
+- **Install Copilot Extension in VS Code:**  
+  - Open Extensions (Ctrl+Shift+X), search "GitHub Copilot", install
+
+- **Create Your Project Folder:**  
+  - Example: `MyTradingAI`
+  - Open this folder in VS Code
+
+- **Set Up a Virtual Environment:**  
+  - In VS Code terminal:  
+    - `python -m venv venv`
+    - Activate:  
+      - Windows: `.\venv\Scripts\activate`  
+      - macOS/Linux: `source venv/bin/activate`
+
+- **Create `requirements.txt`:**  
+  ```
+  requests
+  pandas
+  python-dotenv
+  newsapi-python
+  alpaca-trade-api
+  google-generativeai
+  yfinance
+  ta-lib
+  ```
+  - Install: `pip install -r requirements.txt`
+
+- **Store API Keys Securely:**  
+  - Create `.env` file in your project folder:
+    ```
+    ALPACA_API_KEY=YOUR_ALPACA_API_KEY
+    ALPACA_SECRET_KEY=YOUR_ALPACA_SECRET_KEY
+    NEWS_API_KEY=YOUR_NEWS_API_KEY
+    GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+    ```
+  - **Never share this file!**
+
+---
+
+## Phase 2: Data Collection & Preparation
+
+### 2. Fetch Historical Trading Data
+
+- Use `yfinance` to get stock data.
+- Create `data_collector.py`.
+- Save data to `data/{symbol}_history.csv`.
+
+### 3. Fetch News Data
+
+- Use `newsapi-python`.
+- Save news to `data/{query}_news.csv`.
+
+### 4. Calculate Technical Indicators
+
+- Use `pandas_ta` (or `ta-lib`).
+- Create `indicators.py`.
+- Save processed data to `data/{symbol}_history_with_indicators.csv`.
+
+---
+
+## Phase 3: LLM Integration & Decision Making
+
+### 5. Integrate Gemini for Analysis
+
+- Create `ai_brain.py`.
+- Use Gemini API to analyze data and news.
+- Parse Gemini's output for:
+  - Sentiment score
+  - Suggested action (BUY/SELL/HOLD)
+  - Reasoning
+  - Risks
+
+### 6. Decision Making & Risk Management
+
+- Use your own rules + Gemini's output.
+- Create/extend `decision_maker.py`.
+- Define risk settings (max risk per trade, sentiment thresholds, etc).
+
+---
+
+## Phase 4: Execution, Logging & Learning
+
+### 7. Execute Trades (Alpaca API)
+
+- Use Alpaca's **paper trading** API.
+- Create `trade_executor.py`.
+
+### 8. Portfolio & State Update, Logging
+
+- Create `portfolio_manager.py`.
+- Save state to `portfolio_state.json`:
+  - cash, holdings, trade_log, llm_reflection_log, current_prices, cycle_count
+
+### 9. Reflection & Learning Loop
+
+- Create/extend `learning_agent.py`.
+- Periodically feed trade outcomes to Gemini for reflection.
+
+---
+
+## Phase 5: Orchestration
+
+### 10. Main Loop
+
+- Create `main_agent.py`.
+- Orchestrate all steps in order:
+  1. Load state
+  2. Update from Alpaca
+  3. Collect data
+  4. LLM analysis & decision
+  5. Execute trades
+  6. Update/log state
+  7. Reflect (periodically)
+  8. Wait for next cycle
+
+---
+
+## Data & Files
+
+- **portfolio_state.json:**  
+  - cash, holdings, trade_log, llm_reflection_log, current_prices, cycle_count
+
+- **data/ folder:**  
+  - `{symbol}_history.csv`: Raw historical data  
+  - `{symbol}_processed_history.csv`: With indicators  
+  - `{query}_news.csv` / `general_market_news.csv`: News data
+
+---
+
+## What Goes to Gemini?
+
+- Asset symbol (e.g., "AAPL")
+- Current price
+- Recent price history & indicators
+- Summarized news headlines
+- Previous AI actions/reasoning/outcomes
+
+---
+
+## Final Reminders
+
+- **Start with Paper Trading!**  
+  Never use real money until proven safe.
+
+- **Quota Management:**  
+  Use small page sizes, longer intervals, and minimal history at first.
+
+- **Error Handling:**  
+  Use try/except around all API calls.
+
+- **Iterate and Improve:**  
+  Start simple, then add features.
+
+- **Use Copilot:**  
+  Let Copilot suggest code as you comment your intentions.
+
+---
+
+
+record every trade.
+every loss and win
