@@ -4,6 +4,7 @@ import pandas as pd
 from dotenv import load_dotenv
 import json
 from indicators import calculate_indicators
+from portfolio_manager import add_llm_reflection_log  # Ensure this is imported
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -145,14 +146,6 @@ def reflect_and_learn(llm_model, portfolio_state):
     
     except Exception as e:
         print(f"Error during LLM reflection: {e}")
-    
-    def add_llm_reflection_log(portfolio_state, reflection_details):
-        """
-        Adds the LLM reflection details to the portfolio state's reflection log.
-        """
-        if "llm_reflection_log" not in portfolio_state:
-            portfolio_state["llm_reflection_log"] = []
-        portfolio_state["llm_reflection_log"].append(reflection_details)
 
 # This reflection step would be called periodically in your main loop.
 # For example:
