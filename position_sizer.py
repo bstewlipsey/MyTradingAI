@@ -98,10 +98,12 @@ def calculate_position_size(
             return 0
         print(f"Calculated dollar risk per share: ${dollar_risk_per_share:.2f} (based on {atr_stop_multiplier}x ATR)")
     else:
-        # Fallback: If no stop loss or ATR, cannot use risk-based sizing.
-        # This is generally NOT recommended for robust risk management.
-        # For now, we'll return 0, forcing you to define risk.
         print("Warning: Cannot calculate risk per share (no stop loss or ATR provided). Returning 0 shares.")
+        # --- FULL IMPLEMENTATION: Allow fixed fallback size if provided in risk_settings ---
+        fallback_size = risk_settings.get('fallback_size_if_no_risk_defined', 0)
+        if fallback_size > 0:
+            print(f"Using fallback fixed size from risk_settings: {fallback_size} shares.")
+            return int(fallback_size)
         return 0
 
 
@@ -124,23 +126,30 @@ def calculate_position_size(
     # --- 5. Limit by Max Position Per Asset (% of Portfolio Value) ---
     max_position_per_asset_percent = risk_settings.get('max_position_per_asset_percent', 0.05) # Default 5%
     max_dollar_position_per_asset = portfolio_value * max_position_per_asset_percent
-    
-    # Calculate current dollar value of holding for this symbol (if any)
-    # This assumes 'current_portfolio' passed from decision_maker can get holdings.
-    # For now, we'll assume the decision_maker handles this or we pass it explicitly.
-    # A simplified check: if the *new* trade itself would exceed this limit.
-    # A more robust check would involve `current_portfolio['holdings'].get(symbol, {}).get('qty', 0)`.
-    
-    # For simplicity, let's just ensure the *new* trade value doesn't exceed the max per asset.
-    # This is a simplification; a full check would need to know current holdings.
-    max_shares_from_asset_limit = math.floor(max_dollar_position_per_asset / asset_price)
+
+    # --- FULL IMPLEMENTATION: Limit by current holdings ---
+    # If current holdings are available in risk_settings, use them to avoid exceeding max position
+    current_holding_qty = risk_settings.get('current_holding_qty', 0)
+    current_holding_value = current_holding_qty * asset_price
+    # The new trade value should not push us over the max per asset
+    max_new_position_value = max_dollar_position_per_asset - current_holding_value
+    max_shares_from_asset_limit = math.floor(max_new_position_value / asset_price) if asset_price > 0 else 0
+    # If already at or above max, cannot add more
+    if max_shares_from_asset_limit < 0:
+        max_shares_from_asset_limit = 0
     shares_to_trade = min(shares_to_trade, max_shares_from_asset_limit)
-    print(f"Max shares from asset limit ({max_position_per_asset_percent:.2%}): {max_shares_from_asset_limit} shares")
+    print(f"Max shares from asset limit ({max_position_per_asset_percent:.2%}), considering current holdings: {max_shares_from_asset_limit} shares")
 
     # Ensure quantity is positive
     shares_to_trade = max(0, shares_to_trade)
     
     print(f"Final calculated shares to trade: {shares_to_trade}")
+    # shares_from_risk = shares based on risk management
+    # max_shares_from_cash = shares based on available cash
+    # max_shares_from_asset_limit = shares based on max position per asset
+
+    # The final shares to trade is the minimum of these three values:
+    # shares_to_trade = min(shares_from_risk, max_shares_from_cash, max_shares_from_asset_limit)
     return int(shares_to_trade) # Return as integer
 
 # --- Test Cases ---

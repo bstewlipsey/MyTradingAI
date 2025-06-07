@@ -1,0 +1,83 @@
+{
+    "cash": 40563.11,
+    "holdings": {
+        "AAPL": {
+            "qty": 37.25,
+            "avg_entry_price": 199.471866,
+            "current_price": 203.92,
+            "market_value": 7596.02,
+            "unrealized_pl": 165.693
+        },
+        "BTCUSD": {
+            "qty": 0.031738455,
+            "avg_entry_price": 105777.403875215,
+            "current_price": 104945.272,
+            "market_value": 3330.800793,
+            "unrealized_pl": -26.41058
+        },
+        "ETHUSD": {
+            "qty": 11.969999999,
+            "avg_entry_price": 2568.763260396,
+            "current_price": 2487.764,
+            "market_value": 29778.535078,
+            "unrealized_pl": -969.561146
+        },
+        "GOOGL": {
+            "qty": 4.0,
+            "avg_entry_price": 171.2525,
+            "current_price": 173.68,
+            "market_value": 694.72,
+            "unrealized_pl": 9.71
+        },
+        "META": {
+            "qty": 10.0,
+            "avg_entry_price": 693.88,
+            "current_price": 697.71,
+            "market_value": 6977.1,
+            "unrealized_pl": 38.3
+        },
+        "NKE": {
+            "qty": 159.0,
+            "avg_entry_price": 63.365786,
+            "current_price": 62.8,
+            "market_value": 9985.2,
+            "unrealized_pl": -89.96
+        },
+        "NVDA": {
+            "qty": 14.0,
+            "avg_entry_price": 139.597857,
+            "current_price": 141.72,
+            "market_value": 1984.08,
+            "unrealized_pl": 29.71
+        },
+        "TSLA": {
+            "qty": -6.0,
+            "avg_entry_price": 300.898333,
+            "current_price": 295.14,
+            "market_value": -1770.84,
+            "unrealized_pl": 34.55
+        }
+    },
+    "trade_log": [],
+    "llm_reflection_log": [],
+    "current_prices": {
+        "AAPL": 203.9199981689453,
+        "BTCUSD": 104945.272,
+        "ETHUSD": 2487.764,
+        "GOOGL": 173.67999267578125,
+        "META": 697.7100219726562,
+        "NKE": 62.79999923706055,
+        "NVDA": 141.72000122070312,
+        "TSLA": 295.1400146484375,
+        "PFE": 23.350000381469727,
+        "BTC-USD": 104886.2734375,
+        "ETH-USD": 2492.03125,
+        "AMZN": 213.57000732421875
+    },
+    "cycle_count": 1,
+    "decision_history": [],
+    "llm_prompt_template": "My primary goal is to execute lots of small, high-frequency trades with a higher risk tolerance.\n\nThe current trading cycle is 30 minutes.\n\nYou are an expert financial analyst. Analyze the following information for {symbol}:\n\nCurrent Price: ${current_price}\n\nRecent Price History & Technical Indicators (last few days/weeks, simplified):\n{history_str}\n\nRecent News Headlines (from real-time Alpaca WebSocket, most relevant to this cycle):\n{news_str}\n\nPast Trading Performance/Reflections (my AI's previous actions/outcomes for this asset):\n{past_trades_summary}\n\n---\nYou have access to the following technical indicators: SMA_20, RSI, MACD, Bollinger Bands, OBV, ATR, and others. Use them in your analysis and explain how they influence your recommendation. If news headlines are present, consider their immediate impact for this cycle.\n\nBased on this data, provide your response in the following strict JSON format (do not include any explanation, ```json, or text outside the JSON):\n{\n  \"sentiment\": <integer from -100 to 100>,\n  \"action\": \"BUY\" | \"SELL\" | \"HOLD\",\n  \"reasoning\": <string>,\n  \"risks\": <string>\n}\n",
+    "adaptation_log": [],
+    "anomaly_log": [],
+    "portfolio_value": 99138.73
+}

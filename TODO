@@ -1,3 +1,5 @@
+# [2025-06] UPDATE: The main trading cycle now increments cycle_count only ONCE per cycle (at STEP 4 in main_agent.py). The previous double-increment (before and after reflection) has been fixed. Reflection and learning are now triggered based on this single increment. All flow diagrams and instructions below are now aligned with this update.
+
 # Agentic Trading AI: Step-by-Step Guide
 
 ## Goal
@@ -184,6 +186,168 @@ Create an automatic trading AI that:
 
 ---
 
+# PRIORITIZED TASKS (2025-06)
 
-record every trade.
-every loss and win
+## Category 1: CRITICAL Data & Infrastructure (Highest Priority)
+These are fundamental requirements for your day trading bot to function correctly and make informed decisions based on timely data.
+
+### 1. Implement Alpaca Real-Time News WebSocket Client
+- **Why:** This is the dedicated channel for real-time news from Alpaca, crucial for your 30-minute day trading cycles, replacing your previous inadequate news source.
+- **Action Needed:**
+  - `data_collector.py`: Create a new function or class to handle a WebSocket connection.
+  - Establish and maintain a WebSocket connection to `wss://stream.data.alpaca.markets/v1beta1/news` (or the sandbox URL for testing).
+  - Implement authentication using your `APCA-API-KEY-ID` and `APCA-API-SECRET-KEY`.
+  - Send a subscribe message for the "news" channel (e.g., `{ "action": "subscribe", "news": ["*"] }`).
+  - Process incoming JSON messages with `T: "n"` (for news). Extract `headline`, `summary`, `created_at`, `symbols`, etc.
+  - Store or buffer the latest relevant news articles in a way that your `ai_brain` can access them during each cycle.
+  - **Integration:** Ensure your main trading loop (`main_agent.py`) can efficiently retrieve the latest news from this new WebSocket-powered news buffer/store.
+
+### 2. Data Granularity Adjustments for Indicators
+- **Why:** Your technical indicators must be calculated on relevant intraday data (e.g., 5-minute, 15-minute, or 30-minute bars) for day trading, not daily bars.
+- **Action Needed:**
+  - `data_collector.py`: Ensure your `get_historical_data` function explicitly requests `timeframe='30Min'` (or `15Min`, `5Min` for more detail) when calling the Alpaca bars API.
+  - `config.py`: Adjust `LOOKBACK_PERIOD_HISTORY` to a suitable duration (e.g., `"7D"` or `"14D"`) that fetches enough intraday bars for your indicators.
+
+---
+
+## Category 2: Core AI Strategy & Intelligence (High Priority)
+These directly enhance the quality of your LLM's analysis and decision-making.
+
+### 3. Indicator Diversification
+- **Why:** Relying only on RSI and SMA is insufficient for robust day trading signals.
+- **Action Needed:**
+  - `indicators.py`: Implement functions to calculate additional technical indicators like:
+    - MACD (Moving Average Convergence Divergence)
+    - Bollinger Bands
+    - Volume-based indicators (e.g., On-Balance Volume - OBV)
+    - Ensure ATR (Average True Range) is accurately calculated and passed.
+  - `data_collector.py`: Integrate these new indicators into the `market_state` dictionary that is passed to your `ai_brain`.
+
+### 4. LLM Prompt Improvements
+- **Why:** To ensure the LLM uses all available information effectively and aligns its advice with your specific trading goals.
+- **Action Needed:**
+  - `config.py`: Add a new configurable variable like `TRADING_GOAL_DESCRIPTION` (e.g., "My primary goal is to execute lots of small, high-frequency trades with a higher risk tolerance...").
+  - `ai_brain.py`:
+    - Inject `TRADING_GOAL_DESCRIPTION` into the LLM's prompt.
+    - Explicitly tell the LLM about `CYCLE_INTERVAL_SECONDS` (e.g., "The current trading cycle is X minutes.").
+    - Instruct the LLM on how to use the newly added indicators (MACD, Bollinger Bands, Volume, etc.) in its analysis and reasoning.
+    - Integrate the real-time news more effectively: Adapt the prompt to clearly present the fresh news from the WebSocket and instruct the LLM on its immediate relevance to the current cycle.
+
+---
+
+## Category 3: Bot Robustness & Long-Term Learning (High/Medium Priority)
+These are crucial for verifying your bot's reliability and enabling future adaptive learning.
+
+### 5. Automated Testing and Validation
+- **Why:** To ensure all new safety, logging, and trading features work as intended in a full trading cycle, and to confirm the bot's behavior without risking capital.
+- **Action Needed:**
+  - Develop Unit Tests for individual functions (e.g., indicator calculations, P&L updates, order placement logic, WebSocket news parsing).
+  - Implement Integration Tests / Backtesting to simulate full trading cycles using historical data (in paper trading mode).
+  - Plan for Continuous Monitoring and alerting for production deployment.
+
+### 6. Advanced Learning / Reflection (Actively Adapting Strategy)
+- **Why:** This step involves using the collected `experience_log` and `llm_reflection_log` to actively change the bot's future behavior or strategy parameters.
+- **Action Needed:**
+  - Design a Feedback Loop: Determine how the LLM's reflections and past trade outcomes will translate into actionable changes (e.g., dynamically adjusting `RISK_SETTINGS`, sentiment thresholds, or even parts of the LLM's prompt itself).
+  - Implement Adaptive Logic: Code the mechanisms to apply these adaptations based on the LLM's insights and performance metrics.
+
+
+# [2025-06] NOTE: The main trading cycle now increments cycle_count only ONCE per cycle (at STEP 4 in main_agent.py). The previous double-increment (before and after reflection) has been fixed. Reflection and learning are now triggered based on this single increment. All flow diagrams and instructions should reflect this update.
+
+┌──────────────────────────────┐
+│ Start Trading Cycle          │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Load Portfolio State         │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Anomaly Alert?               │
+│  ├─ Yes: Print anomalies     │
+│  └─ No: Continue             │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Increment Cycle Count        │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Update Portfolio from Alpaca │
+│ (account, positions, prices) │
+│  ├─ If fail: exit            │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Data Collection:             │
+│  ├─ For each symbol:         │
+│  │   ├─ Get historical data  │
+│  │   ├─ Calculate indicators │
+│  │   └─ Save processed data  │
+│  └─ Fetch news (periodic)    │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Update current prices        │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ For each symbol:             │
+│  ├─ Load processed data      │
+│  ├─ Get market state snapshot│
+│  ├─ Get relevant news        │
+│  ├─ Get experience insight   │
+│  ├─ Build past trades summary│
+│  ├─ Get LLM analysis         │
+│  │   └─ If fail: fallback    │
+│  ├─ Call make_trading_decision│
+│  ├─ If BUY/SELL:             │
+│  │   ├─ Execute trade        │
+│  │   ├─ Place stop-loss      │
+│  │   ├─ Update portfolio     │
+│  │   ├─ Update trade outcomes│
+│  │   ├─ Log trade            │
+│  │   └─ Add experience log   │
+│  └─ Log decision to history  │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Save portfolio state         │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Reflection & Learning?       │
+│ (every N cycles)             │
+│  ├─ Yes:                     │
+│  │   ├─ LLM reflection       │
+│  │   ├─ Log reflection       │
+│  │   ├─ Save state           │
+│  │   └─ Adaptive learning    │
+│  └─ No: Continue             │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Adaptive Cooldown?           │
+│  ├─ Yes: Print & skip        │
+│  └─ No: Continue             │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Print cycle complete         │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Wait for next cycle          │
+└──────────────────────────────┘

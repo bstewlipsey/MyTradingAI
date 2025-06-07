@@ -2,9 +2,12 @@ import google.generativeai as genai
 import os
 import pandas as pd
 from dotenv import load_dotenv
-import json
+import re
+import json as _json
 from indicators import calculate_indicators
-from portfolio_manager import add_llm_reflection_log  # Ensure this is imported
+from portfolio_manager import add_llm_reflection_log, load_portfolio_state, save_portfolio_state
+from config import LLM_PROMPT_TEMPLATE, RISK_MANAGEMENT_VARS
+from datetime import datetime
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -17,39 +20,59 @@ def get_llm_analysis(symbol, current_price, recent_history_df, news_df, past_tra
     """
     Gets Gemini's analysis, sentiment, and suggested action for a given asset.
     """
+    # Always use the latest prompt template from state
+    state = load_portfolio_state()
+    prompt_template = state.get("llm_prompt_template", LLM_PROMPT_TEMPLATE)
+
     # Prepare recent history string
     history_str = ""
     if not recent_history_df.empty:
-        history_str = recent_history_df[['Close', 'SMA_20', 'RSI']].to_string(index=True)
+        # Add more indicators for LLM prompt
+        indicator_cols = [col for col in recent_history_df.columns if col not in ["Date"]]
+        history_str = recent_history_df[indicator_cols].to_string(index=True)
+
+    # Dynamically use all indicator columns (exclude 'Date' and non-numeric columns)
+    if not recent_history_df.empty:
+        indicator_cols = [col for col in recent_history_df.columns if col not in ["Date"] and pd.api.types.is_numeric_dtype(recent_history_df[col])]
+        # Add summary of most recent values for all indicators
+        last_row = recent_history_df.iloc[-1]
+        indicator_summary = [f"{ind}: {last_row[ind]:.2f}" for ind in indicator_cols if ind in last_row and pd.notnull(last_row[ind])]
+        if indicator_summary:
+            history_str += "\n\nLatest Indicator Values: " + ", ".join(indicator_summary)
+        # Add trend lines for all indicators
+        trend_lines = []
+        for ind in indicator_cols:
+            if ind in recent_history_df.columns:
+                last_vals = recent_history_df[ind].tail(5).tolist()
+                if len(last_vals) == 5 and all(pd.notnull(last_vals)):
+                    if last_vals[-1] > last_vals[0]:
+                        trend = "rising"
+                    elif last_vals[-1] < last_vals[0]:
+                        trend = "falling"
+                    else:
+                        trend = "flat"
+                    trend_lines.append(f"{ind} trend over last 5 bars: {trend}")
+        if trend_lines:
+            history_str += "\n" + "\n".join(trend_lines)
 
     # Prepare news headlines string
     news_str = ""
     if not news_df.empty:
-        news_str = "\n".join([f"- {row['title']} (Source: {row['source']})" for index, row in news_df.iterrows()])
+        news_str = "\n".join([f"- {row['title']} (Source: {row.get('source','N/A')})" for index, row in news_df.iterrows()])
 
-    # Construct the prompt for Gemini
-    prompt = f"""
-    You are an expert financial analyst. Analyze the following information for {symbol}:
+    # Add a summary of the most recent news headline for LLM prompt clarity
+    if not news_df.empty:
+        latest_news = news_df.iloc[0]
+        news_str += f"\n\nMost recent headline: {latest_news['title']} (Published: {latest_news.get('created_at', 'N/A')})"
 
-    Current Price: ${current_price:.2f}
-
-    Recent Price History & Technical Indicators (last few days/weeks, simplified):
-    {history_str}
-
-    Recent News Headlines:
-    {news_str}
-
-    Past Trading Performance/Reflections (my AI's previous actions/outcomes for this asset):
-    {past_trades_summary if past_trades_summary else "No specific past performance to reflect on yet."}
-
-    Based on this data, provide your response in the following strict JSON format (do not include any explanation, ```json, or text outside the JSON):
-    {{
-      "sentiment": <integer from -100 to 100>,
-      "action": "BUY" | "SELL" | "HOLD",
-      "reasoning": <string>,
-      "risks": <string>
-    }}
-    """
+    # --- LLM Prompt Improvements ---
+    prompt = prompt_template.format(
+        symbol=symbol,
+        current_price=current_price,
+        history_str=history_str,
+        news_str=news_str,
+        past_trades_summary=past_trades_summary if past_trades_summary else "No specific past performance to reflect on yet."
+    )
 
     try:
         response = model.generate_content(prompt)
@@ -61,19 +84,14 @@ def get_llm_analysis(symbol, current_price, recent_history_df, news_df, past_tra
         # Parse the JSON response
         try:
             # Try to extract the first JSON object if Gemini returns extra text or markdown
-            import re
             json_match = re.search(r'\{[\s\S]*?\}', analysis_text)
             if json_match:
                 json_str = json_match.group(0)
             else:
                 json_str = analysis_text
-            parsed = json.loads(json_str)
-            sentiment = int(parsed.get("sentiment", 0))
-            action = parsed.get("action", "HOLD").upper()
-            if action not in ['BUY', 'SELL', 'HOLD']:
-                action = 'HOLD'
-            reasoning = parsed.get("reasoning", "")
-            risks = parsed.get("risks", "")
+            result = _json.loads(json_str)
+            result['raw_prompt_sent'] = prompt
+            return result
         except Exception as e:
             print(f"Error parsing Gemini JSON: {e}")
             sentiment = 0
@@ -86,18 +104,20 @@ def get_llm_analysis(symbol, current_price, recent_history_df, news_df, past_tra
             "action": action,
             "reasoning": reasoning,
             "risks": risks,
-            "raw_response": analysis_text
+            "raw_response": analysis_text,
+            "raw_prompt_sent": prompt
         }
 
     except Exception as e:
         print(f"Error querying Gemini for {symbol}: {e}")
-        return {"sentiment": 0, "action": "HOLD", "reasoning": f"Error: {e}", "risks": "API Call Failed"}
+        return {"sentiment": 0, "action": "HOLD", "reasoning": f"Error: {e}", "risks": "API Call Failed", "raw_prompt_sent": prompt}
 
 # (Assuming LLM analysis, portfolio manager functions are available)
 
 def reflect_and_learn(llm_model, portfolio_state):
     """
     Feeds past trade outcomes to Gemini for reflection and learning.
+    After reflection, parses for prompt/parameter suggestions and updates state if needed.
     """
     trade_log = portfolio_state.get("trade_log", [])
     if not trade_log:
@@ -106,6 +126,12 @@ def reflect_and_learn(llm_model, portfolio_state):
 
     # Take a subset of recent trades for reflection to save on tokens/quota
     recent_trades_for_reflection = trade_log[-5:] # Reflect on last 5 trades
+
+    # Build the allowed parameters section dynamically
+    allowed_params = {k: v['range'] for k, v in RISK_MANAGEMENT_VARS.items() if v.get('use_in_llm')}
+    allowed_params_str = '\n'.join([
+        f"- {k} ({v[0]} to {v[1]})" for k, v in allowed_params.items()
+    ])
 
     reflection_prompt = f"""
     You are an expert trading AI. Review the following past trades and your previous reasoning.
@@ -116,10 +142,10 @@ def reflect_and_learn(llm_model, portfolio_state):
     for trade in recent_trades_for_reflection:
         reflection_prompt += f"Symbol: {trade.get('symbol')}, Action: {trade.get('action')}, " \
                              f"Size: {trade.get('size')}, Price: {trade.get('price')}, " \
-                             f"Outcome: [Needs P&L here from actual trade settlement or close], " \
+                             f"Outcome: Realized P&L: ${trade.get('trade_outcome_pl', 0):.2f}, " \
                              f"My Reasoning: {trade.get('llm_reasoning', 'N/A')}\n"
 
-    reflection_prompt += """
+    reflection_prompt += f"""
     --- Reflection Questions ---
     1. What patterns or insights can you identify from these outcomes (successes or failures)?
     2. Where did your previous reasoning align with the outcome, and where did it diverge?
@@ -127,6 +153,51 @@ def reflect_and_learn(llm_model, portfolio_state):
     4. Based on this, suggest any adjustments to the overall trading strategy or factors to prioritize.
 
     Provide a concise but insightful reflection.
+
+    You may suggest changes to the following parameters only (with suggested value ranges):
+{allowed_params_str}
+
+    If you believe a new risk or strategy variable should be added to the system (for example, a new threshold, a new type of limit, or a new adaptive rule), suggest it in a field called "new_variable_suggestions" in your JSON output. For each, provide:
+      - variable_name: a concise name for the new variable
+      - description: what it controls and why it would help
+      - suggested_range: a reasonable min/max or valid values
+      - initial_value: a recommended starting value
+      - example_usage: a one-sentence example of how it would be used in the system
+
+    If you believe a new variable should be added to the LLM's own prompt, memory, or reasoning process (for example, a new context feature, a new type of input, or a new self-reflection metric), suggest it in a field called "llm_self_variable_suggestions" in your JSON output. For each, provide:
+      - variable_name: a concise name for the new LLM self-variable
+      - description: what it represents and how it could improve LLM performance
+      - suggested_range: a reasonable min/max or valid values
+      - initial_value: a recommended starting value
+      - example_usage: a one-sentence example of how the LLM would use this variable in its own reasoning or prompt
+
+    At the end, output a single JSON object with any suggested changes, for example:
+    {{
+      "prompt_suggestion": "...new prompt template...",
+      "param_suggestions": {{
+        "max_risk_per_trade_percent": 0.03,
+        "min_sentiment_for_buy": 55
+      }},
+      "new_variable_suggestions": [
+        {{
+          "variable_name": "max_drawdown_per_week",
+          "description": "Maximum portfolio drawdown allowed per week before pausing trading.",
+          "suggested_range": [0.01, 0.10],
+          "initial_value": 0.05,
+          "example_usage": "If weekly drawdown exceeds max_drawdown_per_week, halt new trades until review."
+        }}
+      ],
+      "llm_self_variable_suggestions": [
+        {{
+          "variable_name": "reflection_depth",
+          "description": "How many past cycles the LLM should consider in its self-reflection.",
+          "suggested_range": [1, 20],
+          "initial_value": 5,
+          "example_usage": "Set reflection_depth to 10 to consider a longer history in prompt construction."
+        }}
+      ]
+    }}
+    If you have no suggestions, output an empty JSON object: {{}}
     """
 
     try:
@@ -141,9 +212,72 @@ def reflect_and_learn(llm_model, portfolio_state):
             "trades_reviewed": recent_trades_for_reflection,
             "llm_reflection": reflection_text
         }
-
         add_llm_reflection_log(portfolio_state, reflection_details)
-    
+
+        # --- Parse for JSON suggestions ---
+        json_match = re.search(r'\{[\s\S]*\}', reflection_text)
+        suggestions = {}
+        if json_match:
+            try:
+                suggestions = _json.loads(json_match.group(0))
+            except Exception as e:
+                print(f"Error parsing LLM JSON suggestions: {e}")
+        prompt_suggestion = suggestions.get('prompt_suggestion')
+        param_suggestions = suggestions.get('param_suggestions', {})
+        # --- New: Capture any new variable suggestions ---
+        new_vars = suggestions.get('new_variable_suggestions', {})
+        if new_vars:
+            if 'llm_new_variable_suggestions' not in portfolio_state:
+                portfolio_state['llm_new_variable_suggestions'] = []
+            portfolio_state['llm_new_variable_suggestions'].append({
+                'timestamp': datetime.now().isoformat(),
+                'suggestions': new_vars,
+                'reflection_excerpt': reflection_text[:200]
+            })
+        # --- New: Capture any LLM self-variable suggestions ---
+        llm_self_vars = suggestions.get('llm_self_variable_suggestions', {})
+        if llm_self_vars:
+            if 'llm_self_variable_suggestions' not in portfolio_state:
+                portfolio_state['llm_self_variable_suggestions'] = []
+            portfolio_state['llm_self_variable_suggestions'].append({
+                'timestamp': datetime.now().isoformat(),
+                'suggestions': llm_self_vars,
+                'reflection_excerpt': reflection_text[:200]
+            })
+        # Update prompt template if suggested
+        if prompt_suggestion:
+            portfolio_state['llm_prompt_template'] = prompt_suggestion
+            if 'adaptation_log' not in portfolio_state:
+                portfolio_state['adaptation_log'] = []
+            portfolio_state['adaptation_log'].append({
+                'timestamp': datetime.now().isoformat(),
+                'type': 'prompt_update',
+                'new_prompt': prompt_suggestion,
+                'reason': 'LLM reflection suggestion',
+                'reflection_excerpt': str(prompt_suggestion)
+            })
+        # Update parameters if suggested (with min/max safeguards)
+        minmax = allowed_params
+        for k, v in param_suggestions.items():
+            if k in minmax:
+                minv, maxv = minmax[k]
+                try:
+                    val = float(v)
+                    val = max(minv, min(maxv, val))
+                    if 'RISK_SETTINGS' not in portfolio_state:
+                        portfolio_state['RISK_SETTINGS'] = {}
+                    portfolio_state['RISK_SETTINGS'][k] = val
+                    portfolio_state['adaptation_log'].append({
+                        'timestamp': datetime.now().isoformat(),
+                        'type': 'param_update',
+                        'param': k,
+                        'new_value': val,
+                        'reason': 'LLM reflection suggestion',
+                        'reflection_excerpt': f'{k}={v}'
+                    })
+                except Exception:
+                    continue
+        save_portfolio_state(portfolio_state)
     except Exception as e:
         print(f"Error during LLM reflection: {e}")
 

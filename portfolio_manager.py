@@ -1,17 +1,33 @@
 import json
 import os
+import sys
 from datetime import datetime
 import pandas as pd # Import pandas for data handling
+from config import LLM_PROMPT_TEMPLATE
 
 # Define the path for the portfolio state file
 PORTFOLIO_STATE_FILE = "portfolio_state.json"
+PORTFOLIO_STATE_BACKUP_FILE = "portfolio_state_backup.json"
 EXPERIENCE_LOG_FILE = "experience_log.json" # New file for detailed experiences
 
 def load_portfolio_state():
     """Loads the last saved portfolio state."""
     if os.path.exists(PORTFOLIO_STATE_FILE):
         with open(PORTFOLIO_STATE_FILE, "r") as f:
-            return json.load(f)
+            state = json.load(f)
+            # Ensure decision_history key exists
+            if "decision_history" not in state:
+                state["decision_history"] = []
+            # Ensure llm_prompt_template exists
+            if "llm_prompt_template" not in state:
+                state["llm_prompt_template"] = LLM_PROMPT_TEMPLATE
+            # Ensure adaptation_log exists
+            if "adaptation_log" not in state:
+                state["adaptation_log"] = []
+            # Ensure anomaly_log exists
+            if "anomaly_log" not in state:
+                state["anomaly_log"] = []
+            return state
     # Initial state if file doesn't exist
     return {
         "cash": 10000.0,
@@ -19,14 +35,21 @@ def load_portfolio_state():
         "trade_log": [],
         "llm_reflection_log": [],
         "current_prices": {},
-        "cycle_count": 0 # Initialize cycle count
+        "cycle_count": 0, # Initialize cycle count
+        "decision_history": [],
+        "llm_prompt_template": LLM_PROMPT_TEMPLATE,
+        "adaptation_log": [],
+        "anomaly_log": []
     }
 
 def save_portfolio_state(state):
-    """Saves the current portfolio state."""
+    """Saves the current portfolio state and creates a backup."""
     with open(PORTFOLIO_STATE_FILE, "w") as f:
         json.dump(state, f, indent=4)
-    print("Portfolio state saved.")
+    # Backup
+    with open(PORTFOLIO_STATE_BACKUP_FILE, "w") as f:
+        json.dump(state, f, indent=4)
+    print("Portfolio state saved and backup created.")
 
 def add_trade_log(state, trade_details):
     """Adds a trade entry to the log."""
@@ -41,12 +64,12 @@ def add_llm_reflection_log(state, reflection_details):
     print("Logged LLM reflection.")
 
 def update_portfolio_from_alpaca(state, alpaca_account, alpaca_positions, current_prices):
-    """Updates portfolio state from Alpaca API info."""
+    """Updates portfolio state from Alpaca API info. This function is called at the start of every trading cycle to ensure the local state is always synchronized with Alpaca, treating Alpaca as the source of truth."""
     state['cash'] = alpaca_account['cash']
     state['portfolio_value'] = alpaca_account['portfolio_value']
     state['holdings'] = alpaca_positions
     state['current_prices'] = current_prices # Pass latest prices from data collector
-    print("Portfolio state updated from Alpaca.")
+    print("Portfolio state updated from Alpaca (source of truth). All local portfolio values are now overwritten.")
     return state
 
 # --- NEW FUNCTION FOR EXPERIENCE LOGGING ---
@@ -121,6 +144,83 @@ def add_experience_record_util(symbol, market_state, llm_input_prompt, llm_outpu
         json.dump(log, f, indent=4)
     print(f"Experience record logged to file for {symbol}.")
 
+def add_decision_to_history(state, symbol, decision_type, llm_sentiment, llm_reasoning, llm_risks):
+    """
+    Appends a decision record to the decision_history in the portfolio state and saves it.
+    """
+    record = {
+        "timestamp": datetime.now().isoformat(),
+        "symbol": symbol,
+        "decision_type": decision_type,
+        "llm_sentiment": llm_sentiment,
+        "llm_reasoning": llm_reasoning,
+        "llm_risks": llm_risks
+    }
+    if "decision_history" not in state:
+        state["decision_history"] = []
+    state["decision_history"].append(record)
+    save_portfolio_state(state)
+    print(f"Logged decision for {symbol}: {decision_type} (Sentiment: {llm_sentiment})")
+
+
+def update_trade_outcomes_on_close(prev_holdings, curr_holdings, trade_log, latest_prices=None):
+    """
+    Detects closed positions and updates trade_log and experience_log.json with realized P&L.
+    prev_holdings: dict of symbol -> holding info before trade
+    curr_holdings: dict of symbol -> holding info after trade
+    trade_log: list of trade dicts (from portfolio_state)
+    latest_prices: dict of symbol -> price at close (optional, fallback to current_price in prev_holdings)
+    """
+    if latest_prices is None:
+        latest_prices = {}
+    closed_symbols = []
+    for symbol, prev in prev_holdings.items():
+        prev_qty = prev.get('qty', 0)
+        curr_qty = curr_holdings.get(symbol, {}).get('qty', 0)
+        if prev_qty > 0 and curr_qty == 0:
+            # Position closed
+            closed_symbols.append(symbol)
+            avg_entry = prev.get('avg_entry_price', 0)
+            close_price = latest_prices.get(symbol, prev.get('current_price', 0))
+            realized_pl = (close_price - avg_entry) * prev_qty
+            # Find the most recent open trade for this symbol in trade_log
+            for trade in reversed(trade_log):
+                if trade.get('symbol') == symbol and trade.get('action') == 'BUY' and trade.get('trade_outcome_pl', 0.0) == 0.0:
+                    trade['trade_outcome_pl'] = realized_pl
+                    break
+            # Update experience_log.json as well
+            exp_log = load_experience_log()
+            for exp in reversed(exp_log):
+                if exp.get('symbol') == symbol and exp.get('action_taken') == 'BUY' and exp.get('trade_outcome_pl', 0.0) == 0.0:
+                    exp['trade_outcome_pl'] = realized_pl
+                    break
+            save_experience_log(exp_log)
+            print(f"Updated realized P&L for closed {symbol}: {realized_pl:.2f}")
+    return closed_symbols
+
+def restore_portfolio_state_from_backup():
+    """Restores portfolio state from backup file."""
+    if os.path.exists(PORTFOLIO_STATE_BACKUP_FILE):
+        with open(PORTFOLIO_STATE_BACKUP_FILE, "r") as f:
+            backup_state = json.load(f)
+        with open(PORTFOLIO_STATE_FILE, "w") as f:
+            json.dump(backup_state, f, indent=4)
+        print("Portfolio state restored from backup.")
+    else:
+        print("No backup file found.")
+
+# Utility to log anomalies
+def log_anomaly(state, anomaly_type, details):
+    entry = {
+        "timestamp": datetime.now().isoformat(),
+        "anomaly_type": anomaly_type,
+        "details": details
+    }
+    if "anomaly_log" not in state:
+        state["anomaly_log"] = []
+    state["anomaly_log"].append(entry)
+    save_portfolio_state(state)
+    print(f"Anomaly logged: {anomaly_type} - {details}")
 
 if __name__ == "__main__":
     # Example usage for new functions
