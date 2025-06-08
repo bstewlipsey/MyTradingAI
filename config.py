@@ -7,12 +7,13 @@ ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")
 ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-BASE_URL = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+
+PAPER_TRADING = True  # Set to False for live trading
 
 # --- User Configuration ---
-TRADING_SYMBOLS = ["NKE", "PFE", "NVDA", "TSLA", "META", "BTC-USD", "ETH-USD", "AMZN", "AAPL", "GOOGL"]
-CYCLE_INTERVAL_SECONDS = 60 * 30 # Run every 30 minutes
-LOOKBACK_PERIOD_HISTORY = "14D" # Use 14 days of history for intraday bars
+TRADING_SYMBOLS = ["NKE", "PFE", "NVDA", "TSLA", "META", "BTC/USD", "ETH/USD", "AMZN", "AAPL", "GOOGL"]
+CYCLE_INTERVAL_SECONDS = 60 * 30  # Run every 30 minutes (user preference)
+LOOKBACK_PERIOD_HISTORY = "14D" # Use 14 days of history for 30-min cycles (enough for indicators)
 BAR_GRANULARITY = '30Min'  # 30-minute bars for intraday trading
 NEWS_QUERY_LIMIT_PER_SYMBOL = 3 # Max 3 relevant news articles for LLM per symbol
 LLM_REFLECTION_INTERVAL_CYCLES = 6 # Reflect every 6 cycles 
@@ -45,7 +46,8 @@ SIMILARITY_TOLERANCE = 0.10 # 10% tolerance for numerical indicators to be consi
 MAX_SIMILAR_RECORDS = 5 # Max number of similar past experiences to consider
 
 # LLM prompt template for all LLM-based analysis (single source of truth)
-TRADING_GOAL_DESCRIPTION = "My primary goal is to execute lots of small, high-frequency trades with a higher risk tolerance."
+TRADING_GOAL_DESCRIPTION = "The bot's weekly performance goal is to achieve the highest possible Sharpe Ratio, consistently above 1.5, while strictly adhering to a maximum weekly drawdown of 15% and ensuring a positive overall profit factor above 1.2 across all trades."
+
 CYCLE_INTERVAL_SECONDS = 1800  # Example: 30 minutes
 LLM_PROMPT_TEMPLATE = (
     f"{TRADING_GOAL_DESCRIPTION}\n\n"

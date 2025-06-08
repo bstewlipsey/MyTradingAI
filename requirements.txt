@@ -2,7 +2,7 @@ requests
 pandas
 python-dotenv
 newsapi-python
-alpaca-trade-api
+alpaca-py
 google-generativeai
 yfinance
 pandas_ta 

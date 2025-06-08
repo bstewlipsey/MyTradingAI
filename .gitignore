@@ -1,3 +1,26 @@
+# User state
+portfolio_state.json
+portfolio_state_backup.json
+experience_log.json
+llm_reflection_log.json
+# Ignore any other user/session logs
+*_log.json
+
+# Data and logs
+/data/
+*.csv
+*.log
+*.sqlite3
+
+# Environment variables
+.env
+.env.*
+
+# Python virtual environments
+venv/
+ENV/
+.venv/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -10,16 +33,6 @@ build/
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints
 
-# Environment variables
-.env
-.env.*
-
-# Data and logs
-data/
-*.csv
-*.log
-*.sqlite3
-
 # VSCode settings
 .vscode/
 *.code-workspace
@@ -27,12 +40,3 @@ data/
 # OS files
 .DS_Store
 Thumbs.db
-
-# Python virtual environments
-venv/
-ENV/
-.venv/
-
-# User state
-portfolio_state.json
-experience_log.json

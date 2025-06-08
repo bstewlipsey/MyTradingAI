@@ -1,5 +1,5 @@
 {
-    "cash": 40563.11,
+    "cash": 40563.03,
     "holdings": {
         "AAPL": {
             "qty": 37.25,
@@ -11,16 +11,16 @@
         "BTCUSD": {
             "qty": 0.031738455,
             "avg_entry_price": 105777.403875215,
-            "current_price": 104945.272,
-            "market_value": 3330.800793,
-            "unrealized_pl": -26.41058
+            "current_price": 105621.07,
+            "market_value": 3352.249577,
+            "unrealized_pl": -4.961796
         },
         "ETHUSD": {
             "qty": 11.969999999,
-            "avg_entry_price": 2568.763260396,
-            "current_price": 2487.764,
-            "market_value": 29778.535078,
-            "unrealized_pl": -969.561146
+            "avg_entry_price": 2568.504954615,
+            "current_price": 2514.8,
+            "market_value": 30102.155997,
+            "unrealized_pl": -642.848307
         },
         "GOOGL": {
             "qty": 4.0,
@@ -58,26 +58,316 @@
             "unrealized_pl": 34.55
         }
     },
-    "trade_log": [],
+    "trade_log": [
+        {
+            "symbol": "PFE",
+            "action": "BUY",
+            "size": 213,
+            "price": 23.350000381469727,
+            "status": "success",
+            "order_id": "f1fa2ffa-e06f-4846-bc10-ec4bad3107fc",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals.",
+            "trade_outcome_pl": 0.0,
+            "timestamp": "2025-06-07T22:02:34.687984"
+        },
+        {
+            "symbol": "NVDA",
+            "action": "BUY",
+            "size": 35,
+            "price": 141.72000122070312,
+            "status": "success",
+            "order_id": "43a149d6-d55c-44e8-800d-edd77e93805a",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals.",
+            "trade_outcome_pl": 0.0,
+            "timestamp": "2025-06-07T22:02:35.048880"
+        },
+        {
+            "symbol": "AMZN",
+            "action": "BUY",
+            "size": 23,
+            "price": 213.57000732421875,
+            "status": "success",
+            "order_id": "a17e21a1-2f4f-4232-80c9-8cfcde30cc4c",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals.",
+            "trade_outcome_pl": 0.0,
+            "timestamp": "2025-06-07T22:02:35.615820"
+        },
+        {
+            "symbol": "AAPL",
+            "action": "SELL",
+            "size": 37,
+            "price": 203.9199981689453,
+            "status": "failed",
+            "order_id": null,
+            "llm_sentiment": -50,
+            "llm_reasoning": "Price below SMA20 and RSI > 30.",
+            "llm_risks": "LLM unavailable. Used fallback technicals.",
+            "trade_outcome_pl": 0.0,
+            "timestamp": "2025-06-07T22:02:36.021030"
+        },
+        {
+            "symbol": "GOOGL",
+            "action": "BUY",
+            "size": 28,
+            "price": 173.67999267578125,
+            "status": "success",
+            "order_id": "5ae1d6fa-8249-41ce-8a0f-ffe25e9a5474",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals.",
+            "trade_outcome_pl": 0.0,
+            "timestamp": "2025-06-07T22:02:36.543785"
+        },
+        {
+            "symbol": "PFE",
+            "action": "BUY",
+            "size": 213,
+            "price": 23.350000381469727,
+            "status": "success",
+            "order_id": "5fc5a20f-db89-4a75-b10e-78955b9cfc37",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals.",
+            "trade_outcome_pl": 0.0,
+            "timestamp": "2025-06-08T02:18:11.355271"
+        },
+        {
+            "symbol": "NVDA",
+            "action": "BUY",
+            "size": 35,
+            "price": 141.72000122070312,
+            "status": "success",
+            "order_id": "84fa024c-fe6c-4f25-bd6f-4f71c2ce216a",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals.",
+            "trade_outcome_pl": 0.0,
+            "timestamp": "2025-06-08T02:18:11.697171"
+        },
+        {
+            "symbol": "AMZN",
+            "action": "BUY",
+            "size": 23,
+            "price": 213.57000732421875,
+            "status": "success",
+            "order_id": "45b6e41a-4a41-490e-ae58-f404838adea3",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals.",
+            "trade_outcome_pl": 0.0,
+            "timestamp": "2025-06-08T02:18:12.717864"
+        },
+        {
+            "symbol": "AAPL",
+            "action": "SELL",
+            "size": 37,
+            "price": 203.9199981689453,
+            "status": "failed",
+            "order_id": null,
+            "llm_sentiment": -50,
+            "llm_reasoning": "Price below SMA20 and RSI > 30.",
+            "llm_risks": "LLM unavailable. Used fallback technicals.",
+            "trade_outcome_pl": 0.0,
+            "timestamp": "2025-06-08T02:18:13.219096"
+        },
+        {
+            "symbol": "GOOGL",
+            "action": "BUY",
+            "size": 28,
+            "price": 173.67999267578125,
+            "status": "success",
+            "order_id": "20ba761c-2a70-42c7-b1af-7c6285a1c624",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals.",
+            "trade_outcome_pl": 0.0,
+            "timestamp": "2025-06-08T02:18:13.636354"
+        }
+    ],
     "llm_reflection_log": [],
     "current_prices": {
         "AAPL": 203.9199981689453,
-        "BTCUSD": 104945.272,
-        "ETHUSD": 2487.764,
+        "BTCUSD": 105621.07,
+        "ETHUSD": 2514.8,
         "GOOGL": 173.67999267578125,
         "META": 697.7100219726562,
         "NKE": 62.79999923706055,
         "NVDA": 141.72000122070312,
         "TSLA": 295.1400146484375,
         "PFE": 23.350000381469727,
-        "BTC-USD": 104886.2734375,
-        "ETH-USD": 2492.03125,
+        "BTC/USD": 105600.3725,
+        "ETH/USD": 2512.5135,
         "AMZN": 213.57000732421875
     },
-    "cycle_count": 1,
-    "decision_history": [],
+    "cycle_count": 2,
+    "decision_history": [
+        {
+            "timestamp": "2025-06-07T22:02:34.313620",
+            "symbol": "NKE",
+            "decision_type": "HOLD",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-07T22:02:34.690984",
+            "symbol": "PFE",
+            "decision_type": "BUY",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-07T22:02:35.050386",
+            "symbol": "NVDA",
+            "decision_type": "BUY",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-07T22:02:35.128679",
+            "symbol": "TSLA",
+            "decision_type": "HOLD",
+            "llm_sentiment": -50,
+            "llm_reasoning": "Price below SMA20 and RSI > 30.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-07T22:02:35.280581",
+            "symbol": "META",
+            "decision_type": "HOLD",
+            "llm_sentiment": 0,
+            "llm_reasoning": "LLM unavailable. Fallback to technicals.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-07T22:02:35.619140",
+            "symbol": "AMZN",
+            "decision_type": "BUY",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-07T22:02:36.024030",
+            "symbol": "AAPL",
+            "decision_type": "SELL",
+            "llm_sentiment": -50,
+            "llm_reasoning": "Price below SMA20 and RSI > 30.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-07T22:02:36.545783",
+            "symbol": "GOOGL",
+            "decision_type": "BUY",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-08T02:18:10.948488",
+            "symbol": "NKE",
+            "decision_type": "HOLD",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-08T02:18:11.363718",
+            "symbol": "PFE",
+            "decision_type": "BUY",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-08T02:18:11.706166",
+            "symbol": "NVDA",
+            "decision_type": "BUY",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-08T02:18:11.902049",
+            "symbol": "TSLA",
+            "decision_type": "HOLD",
+            "llm_sentiment": -50,
+            "llm_reasoning": "Price below SMA20 and RSI > 30.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-08T02:18:12.283137",
+            "symbol": "META",
+            "decision_type": "HOLD",
+            "llm_sentiment": 0,
+            "llm_reasoning": "LLM unavailable. Fallback to technicals.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-08T02:18:12.737538",
+            "symbol": "AMZN",
+            "decision_type": "BUY",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-08T02:18:13.231533",
+            "symbol": "AAPL",
+            "decision_type": "SELL",
+            "llm_sentiment": -50,
+            "llm_reasoning": "Price below SMA20 and RSI > 30.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        },
+        {
+            "timestamp": "2025-06-08T02:18:13.648643",
+            "symbol": "GOOGL",
+            "decision_type": "BUY",
+            "llm_sentiment": 50,
+            "llm_reasoning": "Price above SMA20 and RSI < 70.",
+            "llm_risks": "LLM unavailable. Used fallback technicals."
+        }
+    ],
     "llm_prompt_template": "My primary goal is to execute lots of small, high-frequency trades with a higher risk tolerance.\n\nThe current trading cycle is 30 minutes.\n\nYou are an expert financial analyst. Analyze the following information for {symbol}:\n\nCurrent Price: ${current_price}\n\nRecent Price History & Technical Indicators (last few days/weeks, simplified):\n{history_str}\n\nRecent News Headlines (from real-time Alpaca WebSocket, most relevant to this cycle):\n{news_str}\n\nPast Trading Performance/Reflections (my AI's previous actions/outcomes for this asset):\n{past_trades_summary}\n\n---\nYou have access to the following technical indicators: SMA_20, RSI, MACD, Bollinger Bands, OBV, ATR, and others. Use them in your analysis and explain how they influence your recommendation. If news headlines are present, consider their immediate impact for this cycle.\n\nBased on this data, provide your response in the following strict JSON format (do not include any explanation, ```json, or text outside the JSON):\n{\n  \"sentiment\": <integer from -100 to 100>,\n  \"action\": \"BUY\" | \"SELL\" | \"HOLD\",\n  \"reasoning\": <string>,\n  \"risks\": <string>\n}\n",
     "adaptation_log": [],
     "anomaly_log": [],
-    "portfolio_value": 99138.73
+    "last_anomaly_alert_cycle": 0,
+    "portfolio_value": 99483.72,
+    "adaptive_parameters": {
+        "stop_loss_pct": {
+            "value": 0.02,
+            "min": 0.005,
+            "max": 0.1
+        },
+        "take_profit_pct": {
+            "value": 0.05,
+            "min": 0.01,
+            "max": 0.2
+        },
+        "trade_cooldown_minutes": {
+            "value": 0,
+            "min": 0,
+            "max": 240
+        },
+        "position_sizing_pct_of_portfolio": {
+            "value": 0.05,
+            "min": 0.01,
+            "max": 0.25
+        },
+        "max_daily_drawdown_pct": {
+            "value": 0.03,
+            "min": 0.01,
+            "max": 0.1
+        }
+    },
+    "TRADING_GOAL_DESCRIPTION": "My primary goal is to execute lots of small, high-frequency trades with a higher risk tolerance.",
+    "buying_power": 24142.5
 }

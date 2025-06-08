@@ -1,6 +1,6 @@
 import unittest
 import pandas as pd
-from indicators import calculate_indicators
+from metrics import calculate_indicators
 
 class TestIndicators(unittest.TestCase):
     def setUp(self):

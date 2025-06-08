@@ -5,10 +5,107 @@ from datetime import datetime
 import asyncio
 import sys  # Moved from __main__ block as per TODO
 import signal  # Moved from __main__ block as per TODO
+import json
+import threading
+from alpaca.trading.client import TradingClient
+from alpaca.data.live.stock import StockDataStream
+from alpaca.data.timeframe import TimeFrame
+from config import (
+    TRADING_SYMBOLS, CYCLE_INTERVAL_SECONDS, LOOKBACK_PERIOD_HISTORY, NEWS_QUERY_LIMIT_PER_SYMBOL, 
+    LLM_REFLECTION_INTERVAL_CYCLES, NEWS_FETCH_INTERVAL_CYCLES, RISK_SETTINGS, SIMILARITY_TOLERANCE, 
+    MAX_SIMILAR_RECORDS, ALPACA_API_KEY, ALPACA_SECRET_KEY, BASE_URL
+)
+
+# --- Alpaca API Configuration ---
+# ALPACA_API_KEY, ALPACA_SECRET_KEY, BASE_URL are now imported from config.py
+
+# Determine if paper trading should be enabled based on BASE_URL
+PAPER_TRADING = BASE_URL == "https://paper-api.alpaca.markets"
+
+# Initialize Alpaca Trading Client (REST)
+trading_client = TradingClient(
+    api_key=ALPACA_API_KEY,
+    secret_key=ALPACA_SECRET_KEY,
+    paper=PAPER_TRADING,
+    url_override=BASE_URL
+)
+
+# Global dictionaries for live data
+live_market_data = {}
+live_account_updates = {}
+
+# --- WebSocket Handler Functions ---
+async def on_trade_update(trade):
+    global live_market_data
+    live_market_data[trade.symbol] = {
+        'price': float(trade.price),
+        'timestamp': trade.timestamp.isoformat(),
+        'volume': float(trade.size),
+        'type': 'trade'
+    }
+
+async def on_quote_update(quote):
+    global live_market_data
+    live_market_data[quote.symbol] = {
+        'bid_price': float(quote.bid_price),
+        'ask_price': float(quote.ask_price),
+        'timestamp': quote.timestamp.isoformat(),
+        'type': 'quote'
+    }
+
+async def on_bar_update(bar):
+    global live_market_data
+    live_market_data[bar.symbol] = {
+        'open': float(bar.open),
+        'high': float(bar.high),
+        'low': float(bar.low),
+        'close': float(bar.close),
+        'volume': float(bar.volume),
+        'timestamp': bar.timestamp.isoformat(),
+        'type': 'bar'
+    }
+
+async def on_account_update(account_data):
+    global live_account_updates
+    print(f"!!! Alpaca Account Update Received: {account_data}")
+    live_account_updates['last_update_timestamp'] = datetime.now().isoformat()
+    live_account_updates['cash'] = float(account_data.cash)
+    live_account_updates['equity'] = float(account_data.equity)
+    live_account_updates['buying_power'] = float(account_data.buying_power)
+
+async def on_trade_order_update(trade_update):
+    global live_account_updates
+    print(f"!!! Alpaca Trade Update Received: {trade_update.order.symbol} - {trade_update.event} - Qty: {trade_update.order.qty}")
+    live_account_updates['last_trade_update_timestamp'] = datetime.now().isoformat()
+
+# --- Helper to initialize and run WebSocket in a separate thread/task --- TODO
+# def start_alpaca_websocket():
+#     stock_stream = StockDataStream(key_id=ALPACA_API_KEY, secret_key=ALPACA_SECRET_KEY, paper=PAPER_TRADING)
+#     # Subscribe to all symbols in TRADING_SYMBOLS for trades, quotes, bars
+#     for symbol in TRADING_SYMBOLS:
+#         stock_stream.subscribe_trades(on_trade_update, symbol)
+#         stock_stream.subscribe_quotes(on_quote_update, symbol)
+#         stock_stream.subscribe_bars(on_bar_update, symbol, TimeFrame.Minute)
+#     # Account and order updates
+#     trading_stream_client = trading_client.get_stream_client()
+#     trading_stream_client.subscribe_trade_updates(on_trade_order_update)
+#     trading_stream_client.subscribe_account_updates(on_account_update)
+#     async def _run_streams():
+#         await asyncio.gather(
+#             stock_stream.run(),
+#             trading_stream_client.run()
+#         )
+#     loop = asyncio.new_event_loop()
+#     asyncio.set_event_loop(loop)
+#     loop.run_until_complete(_run_streams())
+
+# # Start the WebSocket stream in a background thread at program start
+# ws_thread = threading.Thread(target=start_alpaca_websocket, daemon=True)
+# ws_thread.start()
 
 # Import functions from your other modules
-from data_collector import get_historical_trade_data, start_alpaca_news_ws_background, load_news_from_json
-from indicators import calculate_indicators
+from data_collector import get_historical_trade_data, load_news_from_json, AlpacaNewsWebSocket, AlpacaPortfolio
+from metrics import calculate_indicators
 from ai_brain import get_llm_analysis, model, reflect_and_learn # Import reflect_and_learn from ai_brain
 from decision_maker import make_trading_decision
 from trade_executor import get_open_positions, get_account_info, execute_trade, BASE_URL, place_stop_loss_order
@@ -21,47 +118,114 @@ from learning_agent import analyze_llm_reflections
 
 
 
-def main_trading_cycle():
-    # STEP 1: Start Trading Cycle
-    print(f"\n--- Starting Trading Cycle: {datetime.now().isoformat()} ---")
-    
-    # STEP 2: Load Portfolio State
-    portfolio_state = load_portfolio_state()
-    
-    # STEP 3: Anomaly Alert? (Print any new anomalies this cycle)
-    last_alerted_cycle = portfolio_state.get('last_anomaly_alert_cycle', 0)
-    new_anomalies = [a for a in portfolio_state.get('anomaly_log', []) if a.get('cycle', 0) > last_alerted_cycle]
-    if new_anomalies:
-        print("\n!!! ANOMALY ALERT !!!")
-        for anomaly in new_anomalies:
-            print(f"[{anomaly['timestamp']}] {anomaly['anomaly_type']}: {anomaly['details']}")
-        portfolio_state['last_anomaly_alert_cycle'] = portfolio_state.get('cycle_count', 0)
-        save_portfolio_state(portfolio_state)
+def safe_symbol(symbol):
+    """Convert any symbol to a safe filename format (slashes to dashes)."""
+    return symbol.replace("/", "-")
 
-    # STEP 4: Increment Cycle Count
-    portfolio_state['cycle_count'] = portfolio_state.get('cycle_count', 0) + 1
+class TradingBot:
+    def __init__(self):
+        self.live_market_data = {}
+        self.live_account_updates = {}
+
+    async def on_trade_update(self, trade):
+        self.live_market_data[trade.symbol] = {
+            'price': float(trade.price),
+            'timestamp': trade.timestamp.isoformat(),
+            'volume': float(trade.size),
+            'type': 'trade'
+        }
+
+    async def on_quote_update(self, quote):
+        self.live_market_data[quote.symbol] = {
+            'bid_price': float(quote.bid_price),
+            'ask_price': float(quote.ask_price),
+            'timestamp': quote.timestamp.isoformat(),
+            'type': 'quote'
+        }
+
+    async def on_bar_update(self, bar):
+        self.live_market_data[bar.symbol] = {
+            'open': float(bar.open),
+            'high': float(bar.high),
+            'low': float(bar.low),
+            'close': float(bar.close),
+            'volume': float(bar.volume),
+            'timestamp': bar.timestamp.isoformat(),
+            'type': 'bar'
+        }
+
+    async def on_account_update(self, account_data):
+        print(f"!!! Alpaca Account Update Received: {account_data}")
+        self.live_account_updates['last_update_timestamp'] = datetime.now().isoformat()
+        self.live_account_updates['cash'] = float(account_data.cash)
+        self.live_account_updates['equity'] = float(account_data.equity)
+        self.live_account_updates['buying_power'] = float(account_data.buying_power)
+
+    async def on_trade_order_update(self, trade_update):
+        print(f"!!! Alpaca Trade Update Received: {trade_update.order.symbol} - {trade_update.event} - Qty: {trade_update.order.qty}")
+        self.live_account_updates['last_trade_update_timestamp'] = datetime.now().isoformat()
+
+# [BL] Step 2 Start Main Cycle
+def main_trading_cycle(bot, portfolio):
+    ['cycle_count'] = .get('cycle_count', 0) + 1
+    print(f"\n--- Starting Trading Cycle: {datetime.now().isoformat()} ---")
+
+    # [BL] Step 2.1 get current portfolio state
+    portfolio_state = portfolio.get_portfolio_state()
+    if isinstance(portfolio_state, list) and len(portfolio_state) <= 0:
+        #sleep until next cylce
+        print("No portfolio state found, waiting for next cycle...")
+        return
+        
     cycle_count = portfolio_state['cycle_count']
     cash_val = portfolio_state.get('cash', 'N/A')
     port_val = portfolio_state.get('portfolio_value', 'N/A')
-    try:
-        cash_str = f"${float(cash_val):.2f}" if isinstance(cash_val, (int, float)) or (isinstance(cash_val, str) and cash_val.replace('.', '', 1).isdigit()) else str(cash_val)
-    except Exception:
-        cash_str = str(cash_val)
-    try:
-        port_str = f"${float(port_val):.2f}" if isinstance(port_val, (int, float)) or (isinstance(port_val, str) and port_val.replace('.', '', 1).isdigit()) else str(port_val)
-    except Exception:
-        port_str = str(port_val)
+    if cash_val == 'N/A':
+        cash_str = 'N/A'
+    else:
+        try:
+            cash_str = f"${float(cash_val):.2f}"
+        except Exception:
+            cash_str = str(cash_val)
+    if port_val == 'N/A':
+        port_str = 'N/A'
+    else:
+        try:
+            port_str = f"${float(port_val):.2f}"
+        except Exception:
+            port_str = str(port_val)
     print(f"Current Cash: {cash_str}, Portfolio Value: {port_str}")
 
-    # STEP 5: Update Portfolio from Alpaca (account, positions, prices)
-    alpaca_account = get_account_info()
-    if alpaca_account:
-        alpaca_positions = get_open_positions()
-        current_prices_from_alpaca_holdings = {p: alpaca_positions[p]['current_price'] for p in alpaca_positions}
-        portfolio_state = update_portfolio_from_alpaca(portfolio_state, alpaca_account, alpaca_positions, current_prices_from_alpaca_holdings)
-    else:
-        print("WARNING: Could not connect to Alpaca or fetch account info. Using cached portfolio state.")
-        sys.exit(1)  # Exit if we can't get account info, as we need it for trading decisions
+    # --- STEP 5: Update Portfolio from Alpaca (THE TRUTH) ---
+    print("Fetching latest account and position data from Alpaca...")
+    try:
+        alpaca_account = trading_client.get_account()
+        alpaca_positions = trading_client.get_all_positions()
+        portfolio_state['cash'] = float(alpaca_account.cash)
+        portfolio_state['portfolio_value'] = float(alpaca_account.equity)
+        portfolio_state['buying_power'] = float(alpaca_account.buying_power)
+        portfolio_state['holdings'] = {}
+        for pos in alpaca_positions:
+            portfolio_state['holdings'][pos.symbol] = {
+                'qty': float(pos.qty),
+                'avg_entry_price': float(pos.avg_entry_price),
+                'current_price': float(pos.current_price),
+                'market_value': float(pos.market_value),
+                'unrealized_pnl': float(pos.unrealized_pl)
+            }
+        print(f"Alpaca Sync: Cash: ${portfolio_state['cash']:.2f}, Portfolio Value: ${portfolio_state['portfolio_value']:.2f}")
+        live_account_updates.clear()
+    except Exception as e:
+        print(f"ERROR: Failed to update portfolio from Alpaca: {e}")
+        portfolio_state.get('anomaly_log', []).append({
+            'timestamp': datetime.now().isoformat(),
+            'cycle': cycle_count,
+            'anomaly_type': 'Alpaca API Failure',
+            'details': str(e)
+        })
+        save_portfolio_state(portfolio_state)
+        print("Exiting cycle due to critical Alpaca API error.")
+        return
 
     # STEP 6: Data Collection (historical, indicators, news)
     os.makedirs("data", exist_ok=True)
@@ -74,7 +238,9 @@ def main_trading_cycle():
         history_df = get_historical_trade_data(symbol, period=LOOKBACK_PERIOD_HISTORY)
         if not history_df.empty:
             history_df_with_indicators = calculate_indicators(history_df)
-            history_df_with_indicators.to_csv(f"data/{symbol}_processed_history.csv")
+            # Use safe_symbol for all file operations
+            processed_path = f"data/{safe_symbol(symbol)}_processed_history.csv"
+            history_df_with_indicators.to_csv(processed_path)
             latest_prices[symbol] = history_df_with_indicators['Close'].iloc[-1]
         else:
             print(f"Could not get historical data for {symbol}. Skipping.")
@@ -105,7 +271,8 @@ def main_trading_cycle():
 
         # Load processed data for LLM and Experience Learner
         try:
-            history_df = pd.read_csv(f"data/{symbol}_processed_history.csv", index_col="Date", parse_dates=True)
+            processed_path = f"data/{safe_symbol(symbol)}_processed_history.csv"
+            history_df = pd.read_csv(processed_path, index_col="Date", parse_dates=True)
             recent_history_for_llm = history_df.tail(10) # Last 10 rows for LLM
             # Get market state snapshot for experience learner
             current_market_state_snapshot = get_market_state_snapshot(history_df, symbol)
@@ -120,8 +287,17 @@ def main_trading_cycle():
             print(f"Error preparing data for {symbol}: {e}. Skipping.")
             continue
 
-        relevant_news_for_llm = all_news_data[all_news_data['title'].str.contains(symbol, case=False, na=False) |
-                                              all_news_data['description'].str.contains(symbol, case=False, na=False)].head(NEWS_QUERY_LIMIT_PER_SYMBOL)
+        # Fix: Use .get for missing keys in news DataFrame
+        title_col = 'title' if 'title' in all_news_data.columns else 'headline'
+        desc_col = 'description' if 'description' in all_news_data.columns else 'summary'
+        # Fix: Ensure columns exist for filtering, fill with empty string if missing
+        for col in [title_col, desc_col]:
+            if col not in all_news_data.columns:
+                all_news_data[col] = ''
+        relevant_news_for_llm = all_news_data[
+            all_news_data[title_col].str.contains(symbol, case=False, na=False) |
+            all_news_data[desc_col].str.contains(symbol, case=False, na=False)
+        ].head(NEWS_QUERY_LIMIT_PER_SYMBOL)
 
         # --- Consult Experience Learner ---
         learning_insight = ""
@@ -155,6 +331,7 @@ def main_trading_cycle():
                 past_trades_summary += " The trade encountered an issue."
 
         # Add the learning insight to the LLM's prompt
+        llm_analysis = {}  # Ensure llm_analysis is always defined
         try:
             llm_analysis = get_llm_analysis(
                 symbol=symbol,
@@ -205,6 +382,16 @@ def main_trading_cycle():
                 'risks': 'LLM unavailable. Used fallback technicals.',
                 'raw_prompt_sent': '',
                 'size': fallback_size  # Pass fallback_size for downstream use
+            }
+        # Always ensure llm_analysis is a dict after except
+        if not isinstance(llm_analysis, dict):
+            llm_analysis = {
+                'sentiment': 0,
+                'action': 'HOLD',
+                'reasoning': 'LLM unavailable. Fallback failed.',
+                'risks': 'LLM unavailable. Used fallback technicals.',
+                'raw_prompt_sent': '',
+                'size': 0
             }
 
         # --- USE make_trading_decision for risk-managed, position-sized trade decision ---
@@ -353,22 +540,28 @@ def alpaca_symbol(symbol):
     return symbol
 
 
-def main():
-    loop = asyncio.get_event_loop()
-    news_task = start_alpaca_news_ws_background(loop)
+async def main(): # [BL] Step 1 Sync news and Trading cycle
+    print(f"Running trading bot in {'PAPER TRADING' if BASE_URL == 'https://paper-api.alpaca.markets' else 'LIVE TRADING'} mode.") 
+    
+    #  [BL] Step 1.1 Start News Collector
+    news_collector = AlpacaNewsWebSocket()
+
+    # [BL] Step 2 Start Alpaca and Main Cycle
+    portfolio = AlpacaPortfolio()  # Initialize portfolio data
+    tradingBot = TradingBot()  # Create an instance of TradingBot
     try:
-        print(f"Running trading bot in {'PAPER TRADING' if BASE_URL == 'https://paper-api.alpaca.markets' else 'LIVE TRADING'} mode.") 
-        while True:
-            main_trading_cycle()
+       while True:
+            await main_trading_cycle(tradingBot, portfolio)  
+
 
             print(f"Waiting for {CYCLE_INTERVAL_SECONDS} seconds until next cycle...")
-            time.sleep(CYCLE_INTERVAL_SECONDS)
+            await asyncio.sleep(CYCLE_INTERVAL_SECONDS)
             
     except KeyboardInterrupt:
         print("\nShutting down Alpaca News WebSocket...")
         news_task.cancel()
         try:
-            loop.run_until_complete(news_task)
+            await news_task
         except:
             pass
         loop.close()
@@ -377,7 +570,7 @@ def main():
         safe_shutdown()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": # [BL] Step 1 Start setup
     def safe_shutdown(*args):
         print(f"\n[{datetime.now().isoformat()}] Trading agent stopped safely. Saving state...")
         try:
@@ -390,4 +583,4 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, safe_shutdown)
     signal.signal(signal.SIGTERM, safe_shutdown)
     
-    main()
+    asyncio.run(main()) # [BL] Start setup

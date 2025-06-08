@@ -13,12 +13,12 @@ def get_market_state_snapshot(history_df, symbol):
         return {}
 
     # Ensure indicators are calculated
-    # Assuming history_df already has indicators from the 'indicators.py' step
+    # Assuming history_df already has metrics from the 'metrics.py' step
     # If not, you'd call calculate_indicators(history_df) here.
 
     latest_data = history_df.iloc[-1] # Get the very last row (most recent data)
 
-    # Extract key indicators. You can customize which ones are most relevant.
+    # Extract key metrics. You can customize which ones are most relevant.
     # For simplicity, we'll use RSI and MACD signal.
     # You might also want to include recent price change (e.g., 1-day, 5-day % change)
     
@@ -49,7 +49,7 @@ def get_market_state_snapshot(history_df, symbol):
         "RSI": latest_data.get('RSI'),
         "MACD_signal": macd_signal,
         "price_change_5d": price_change_5d, # Percentage change over 5 days
-        # Add other indicators you deem important for defining 'similarity'
+        # Add other metrics you deem important for defining 'similarity'
         # e.g., 'SMA_20_cross_SMA_50': 'bullish_cross' / 'bearish_cross' / 'no_cross'
     }
     return snapshot
@@ -57,7 +57,7 @@ def get_market_state_snapshot(history_df, symbol):
 def find_similar_experiences(current_market_state, tolerance=0.15, max_results=5):
     """
     Finds past experience records that match similar market conditions.
-    Similarity is based on a few key indicators within a 'tolerance' percentage.
+    Similarity is based on a few key metrics within a 'tolerance' percentage.
     """
     experience_log = load_experience_log()
     similar_records = []
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     print("--- Testing Experience Learner ---")
 
     # Mock a current market state (e.g., for AAPL)
-    # This would normally come from your data_collector and indicators modules
+    # This would normally come from your data_collector and metrics modules
     mock_current_aapl_state = {
         "symbol": "AAPL",
         "current_price": 181.0,

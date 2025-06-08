@@ -10,6 +10,39 @@ PORTFOLIO_STATE_FILE = "portfolio_state.json"
 PORTFOLIO_STATE_BACKUP_FILE = "portfolio_state_backup.json"
 EXPERIENCE_LOG_FILE = "experience_log.json" # New file for detailed experiences
 
+def _get_initial_portfolio_state(trading_client_instance):
+    print("Attempting to fetch initial cash and portfolio value from Alpaca...")
+    try:
+        account_info = trading_client_instance.get_account()
+        initial_cash_from_alpaca = float(account_info.cash)
+        initial_portfolio_value_from_alpaca = float(account_info.equity)
+        print(f"Successfully fetched initial cash: ${initial_cash_from_alpaca:.2f}, portfolio value: ${initial_portfolio_value_from_alpaca:.2f} from Alpaca.")
+    except Exception as e:
+        print(f"FATAL: Could not fetch initial account info from Alpaca ({e}). Aborting startup.")
+        raise RuntimeError(f"Could not fetch initial account info from Alpaca: {e}")
+    return {
+        "cash": initial_cash_from_alpaca,
+        "holdings": {},
+        "trade_log": [],
+        "llm_reflection_log": [],
+        "current_prices": {},
+        "cycle_count": 0,
+        "decision_history": [],
+        "llm_prompt_template": LLM_PROMPT_TEMPLATE,
+        "adaptation_log": [],
+        "anomaly_log": [],
+        "last_anomaly_alert_cycle": 0,
+        "portfolio_value": initial_portfolio_value_from_alpaca,
+        "adaptive_parameters": {
+            "stop_loss_pct": {"value": 0.02, "min": 0.005, "max": 0.10},
+            "take_profit_pct": {"value": 0.05, "min": 0.01, "max": 0.20},
+            "trade_cooldown_minutes": {"value": 0, "min": 0, "max": 240},
+            "position_sizing_pct_of_portfolio": {"value": 0.05, "min": 0.01, "max": 0.25},
+            "max_daily_drawdown_pct": {"value": 0.03, "min": 0.01, "max": 0.10}
+        },
+        "TRADING_GOAL_DESCRIPTION": "My primary goal is to execute lots of small, high-frequency trades with a higher risk tolerance."
+    }
+
 def load_portfolio_state():
     """Loads the last saved portfolio state."""
     if os.path.exists(PORTFOLIO_STATE_FILE):
@@ -29,24 +62,16 @@ def load_portfolio_state():
                 state["anomaly_log"] = []
             return state
     # Initial state if file doesn't exist
-    return {
-        "cash": 10000.0,
-        "holdings": {},
-        "trade_log": [],
-        "llm_reflection_log": [],
-        "current_prices": {},
-        "cycle_count": 0, # Initialize cycle count
-        "decision_history": [],
-        "llm_prompt_template": LLM_PROMPT_TEMPLATE,
-        "adaptation_log": [],
-        "anomaly_log": []
-    }
+    from main_agent import trading_client
+    return _get_initial_portfolio_state(trading_client)
 
 def save_portfolio_state(state):
     """Saves the current portfolio state and creates a backup."""
+    print(f"[DEBUG] Saving portfolio state to {PORTFOLIO_STATE_FILE}...")
     with open(PORTFOLIO_STATE_FILE, "w") as f:
         json.dump(state, f, indent=4)
     # Backup
+    print(f"[DEBUG] Saving portfolio state backup to {PORTFOLIO_STATE_BACKUP_FILE}...")
     with open(PORTFOLIO_STATE_BACKUP_FILE, "w") as f:
         json.dump(state, f, indent=4)
     print("Portfolio state saved and backup created.")
@@ -88,7 +113,7 @@ def save_experience_log(log):
 
 def add_experience_record(
     symbol,
-    market_state, # This will be a dictionary of key indicators
+    market_state, # This will be a dictionary of key metrics
     llm_input_prompt,
     llm_output_analysis,
     action_taken,

@@ -38,7 +38,7 @@ All user-editable variables are now in `config.py`, including:
 - `main_agent.py` - Main trading loop
 - `config.py` - All configuration variables
 - `data_collector.py` - Data and news fetching
-- `indicators.py` - Technical indicators
+- `metrics.py` - Technical metrics
 - `ai_brain.py` - LLM analysis and learning
 - `decision_maker.py` - Trade decision logic
 - `trade_executor.py` - Alpaca trade execution

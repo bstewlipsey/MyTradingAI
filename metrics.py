@@ -1,6 +1,10 @@
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="pandas_ta")
+
 import pandas as pd
 import pandas_ta as ta
 from data_collector import get_historical_trade_data
+import os
 
 def calculate_indicators(data):
     """Calculates common technical indicators using pandas_ta."""
@@ -8,10 +12,17 @@ def calculate_indicators(data):
         print("Error: DataFrame is empty. Cannot calculate indicators.")
         return data
 
-    # Ensure 'Close' column exists and is numeric
-    if 'Close' not in data.columns:
-        print("Warning: 'Close' column not found for indicator calculation.")
+    # Standardize column names to title case for consistency
+    data.columns = [col.title() for col in data.columns]
+
+    # Ensure required columns exist
+    required_cols = ['Close', 'High', 'Low', 'Volume']
+    missing_cols = [col for col in required_cols if col not in data.columns]
+    if missing_cols:
+        print(f"Error: Missing required columns for indicator calculation: {missing_cols}")
         return data
+
+    # Ensure 'Close' column is numeric
     data['Close'] = pd.to_numeric(data['Close'], errors='coerce')
     data.dropna(subset=['Close'], inplace=True)
     if data['Close'].isnull().any() or len(data) < 5:
@@ -54,11 +65,14 @@ def calculate_indicators(data):
 
     # Add Moving Average Convergence Divergence (MACD)
     try:
+        if data['Close'].isnull().any():
+            raise ValueError("MACD calculation failed: 'Close' column contains missing values. Please check your data source.")
         macd = ta.macd(data['Close'])
-        if macd is not None and not macd.empty:
-            data = pd.concat([data, macd], axis=1)
+        if macd is None or macd.isnull().any().any():
+            raise ValueError("MACD calculation failed: pandas_ta returned None or NaN values. This indicates a bug or insufficient data.")
+        data = pd.concat([data, macd], axis=1)
     except Exception as e:
-        print(f"MACD calculation failed: {e}")
+        print(e)
 
     # Add Bollinger Bands
     try:
@@ -96,9 +110,18 @@ def calculate_indicators(data):
 
     # Add Money Flow Index (MFI)
     try:
-        data['MFI'] = ta.mfi(data['High'], data['Low'], data['Close'], data['Volume'], length=14)
+        mfi = ta.mfi(data['High'], data['Low'], data['Close'], data['Volume'], length=14)
+        if 'MFI' in data.columns:
+            data = data.drop(columns=['MFI'])
+        if mfi is not None:
+            mfi = pd.Series(mfi, dtype=float, index=data.index)
+            if mfi.isnull().any():
+                mfi = mfi.interpolate(method='linear', limit_direction='both')
+            if mfi.isnull().any():
+                raise ValueError("MFI calculation failed: pandas_ta returned None or NaN values even after interpolation. This indicates a bug or insufficient data.")
+            data['MFI'] = mfi
     except Exception as e:
-        print(f"MFI calculation failed: {e}")
+        print(e)
 
     # Add Rate of Change (ROC)
     try:
@@ -147,20 +170,60 @@ def calculate_indicators(data):
     print(f"Calculated additional indicators for {len(data)} rows.")
     return data
 
+def safe_symbol(symbol):
+    """Convert any symbol to a safe filename format (slashes to dashes)."""
+    return symbol.replace("/", "-")
+
 if __name__ == "__main__":
     # Example usage: Load historical data and calculate indicators
-    # Assume 'data/AAPL_history.csv' exists from Step 2
+    # Load extra data to ensure all indicators have enough lookback
     try:
-        symbols = ["AAPL", "BTC-USD"]
+        symbols = ["AAPL", "BTC/USD", "BTC-USD"]
         for symbol in symbols:
-            trade_history = get_historical_trade_data(symbol)
+            file_symbol = safe_symbol(symbol)
+            input_path = f"data/{file_symbol}_history.csv"
+            output_path = f"data/{file_symbol}_processed_history.csv"
+            # Load more data: at least 100 rows for robust indicator calculation
+            if os.path.exists(input_path):
+                try:
+                    trade_history = pd.read_csv(input_path, index_col="Date", parse_dates=True)
+                except Exception as e:
+                    print(f"CSV read with index_col='Date' failed: {e}")
+                    trade_history = pd.read_csv(input_path)
+                    print(f"Columns after fallback read: {trade_history.columns}")
+                    # Handle 'Date', 'Timestamp', or 'timestamp' as possible date columns
+                    date_col = None
+                    for candidate in ['Date', 'Timestamp', 'timestamp']:
+                        if candidate in trade_history.columns:
+                            date_col = candidate
+                            break
+                    if date_col:
+                        trade_history[date_col] = pd.to_datetime(trade_history[date_col])
+                        trade_history.set_index(date_col, inplace=True)
+                        trade_history.index.name = 'Date'  # Standardize index name
+                    else:
+                        print("Error: No date column ('Date', 'Timestamp', 'timestamp') found after fallback read. Columns are:", trade_history.columns)
+                        raise
+                print(f"Columns after reading {input_path}: {trade_history.columns}")
+                # If less than 100 rows, try to fetch more (if possible)
+                if len(trade_history) < 100:
+                    print(f"Warning: Only {len(trade_history)} rows found for {symbol}. Attempting to fetch more data.")
+                    # Fetch more data and append to existing
+                    more_history = get_historical_trade_data(symbol, min_rows=100)
+                    if more_history is not None and len(more_history) > len(trade_history):
+                        trade_history = more_history
+            else:
+                trade_history = get_historical_trade_data(symbol, min_rows=100)
             trade_history_with_indicators = calculate_indicators(trade_history)
-            
-            print(f"\nTrade history indicators for: {symbol}") 
+            # Drop all rows with any NaN after all indicators are calculated
+            trade_history_with_indicators = trade_history_with_indicators.dropna()
+            if len(trade_history_with_indicators) < 100:
+                print(f"Warning: Only {len(trade_history_with_indicators)} valid rows after indicator calculation for {symbol}.")
+            trade_history_with_indicators.to_csv(output_path)
+            print(f"\nTrade history indicators for: {symbol}")
             print(trade_history.head())  # Debug: show first few rows
             print(trade_history.dtypes)  # Debug: show column types
             print(trade_history_with_indicators.tail())
-    
     except FileNotFoundError:
         print("Run data_collector.py first to generate history CSV files")
     except Exception as e:

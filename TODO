@@ -83,8 +83,8 @@ Create an automatic trading AI that:
 ### 4. Calculate Technical Indicators
 
 - Use `pandas_ta` (or `ta-lib`).
-- Create `indicators.py`.
-- Save processed data to `data/{symbol}_history_with_indicators.csv`.
+- Create `metrics.py`.
+- Save processed data to `data/{symbol}_history_with_metrics.csv`.
 
 ---
 
@@ -161,7 +161,7 @@ Create an automatic trading AI that:
 
 - Asset symbol (e.g., "AAPL")
 - Current price
-- Recent price history & indicators
+- Recent price history & metrics
 - Summarized news headlines
 - Previous AI actions/reasoning/outcomes
 
@@ -202,7 +202,7 @@ These are fundamental requirements for your day trading bot to function correctl
   - Store or buffer the latest relevant news articles in a way that your `ai_brain` can access them during each cycle.
   - **Integration:** Ensure your main trading loop (`main_agent.py`) can efficiently retrieve the latest news from this new WebSocket-powered news buffer/store.
 
-### 2. Data Granularity Adjustments for Indicators
+### 2. Data Granularity Adjustments for Metrics
 - **Why:** Your technical indicators must be calculated on relevant intraday data (e.g., 5-minute, 15-minute, or 30-minute bars) for day trading, not daily bars.
 - **Action Needed:**
   - `data_collector.py`: Ensure your `get_historical_data` function explicitly requests `timeframe='30Min'` (or `15Min`, `5Min` for more detail) when calling the Alpaca bars API.
@@ -216,12 +216,12 @@ These directly enhance the quality of your LLM's analysis and decision-making.
 ### 3. Indicator Diversification
 - **Why:** Relying only on RSI and SMA is insufficient for robust day trading signals.
 - **Action Needed:**
-  - `indicators.py`: Implement functions to calculate additional technical indicators like:
+  - `metrics.py`: Implement functions to calculate additional technical metrics like:
     - MACD (Moving Average Convergence Divergence)
     - Bollinger Bands
     - Volume-based indicators (e.g., On-Balance Volume - OBV)
     - Ensure ATR (Average True Range) is accurately calculated and passed.
-  - `data_collector.py`: Integrate these new indicators into the `market_state` dictionary that is passed to your `ai_brain`.
+  - `data_collector.py`: Integrate these new metrics into the `market_state` dictionary that is passed to your `ai_brain`.
 
 ### 4. LLM Prompt Improvements
 - **Why:** To ensure the LLM uses all available information effectively and aligns its advice with your specific trading goals.
@@ -230,7 +230,7 @@ These directly enhance the quality of your LLM's analysis and decision-making.
   - `ai_brain.py`:
     - Inject `TRADING_GOAL_DESCRIPTION` into the LLM's prompt.
     - Explicitly tell the LLM about `CYCLE_INTERVAL_SECONDS` (e.g., "The current trading cycle is X minutes.").
-    - Instruct the LLM on how to use the newly added indicators (MACD, Bollinger Bands, Volume, etc.) in its analysis and reasoning.
+    - Instruct the LLM on how to use the newly added metrics (MACD, Bollinger Bands, Volume, etc.) in its analysis and reasoning.
     - Integrate the real-time news more effectively: Adapt the prompt to clearly present the fresh news from the WebSocket and instruct the LLM on its immediate relevance to the current cycle.
 
 ---

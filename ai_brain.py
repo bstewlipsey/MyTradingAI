@@ -4,7 +4,7 @@ import pandas as pd
 from dotenv import load_dotenv
 import re
 import json as _json
-from indicators import calculate_indicators
+from metrics import calculate_indicators
 from portfolio_manager import add_llm_reflection_log, load_portfolio_state, save_portfolio_state
 from config import LLM_PROMPT_TEMPLATE, RISK_MANAGEMENT_VARS
 from datetime import datetime
@@ -27,21 +27,21 @@ def get_llm_analysis(symbol, current_price, recent_history_df, news_df, past_tra
     # Prepare recent history string
     history_str = ""
     if not recent_history_df.empty:
-        # Add more indicators for LLM prompt
-        indicator_cols = [col for col in recent_history_df.columns if col not in ["Date"]]
-        history_str = recent_history_df[indicator_cols].to_string(index=True)
+        # Add more metrics for LLM prompt
+        metric_cols = [col for col in recent_history_df.columns if col not in ["Date"]]
+        history_str = recent_history_df[metric_cols].to_string(index=True)
 
-    # Dynamically use all indicator columns (exclude 'Date' and non-numeric columns)
+    # Dynamically use all metric columns (exclude 'Date' and non-numeric columns)
     if not recent_history_df.empty:
-        indicator_cols = [col for col in recent_history_df.columns if col not in ["Date"] and pd.api.types.is_numeric_dtype(recent_history_df[col])]
-        # Add summary of most recent values for all indicators
+        metric_cols = [col for col in recent_history_df.columns if col not in ["Date"] and pd.api.types.is_numeric_dtype(recent_history_df[col])]
+        # Add summary of most recent values for all metrics
         last_row = recent_history_df.iloc[-1]
-        indicator_summary = [f"{ind}: {last_row[ind]:.2f}" for ind in indicator_cols if ind in last_row and pd.notnull(last_row[ind])]
-        if indicator_summary:
-            history_str += "\n\nLatest Indicator Values: " + ", ".join(indicator_summary)
-        # Add trend lines for all indicators
+        metric_summary = [f"{ind}: {last_row[ind]:.2f}" for ind in metric_cols if ind in last_row and pd.notnull(last_row[ind])]
+        if metric_summary:
+            history_str += "\n\nLatest Metric Values: " + ", ".join(metric_summary)
+        # Add trend lines for all metrics
         trend_lines = []
-        for ind in indicator_cols:
+        for ind in metric_cols:
             if ind in recent_history_df.columns:
                 last_vals = recent_history_df[ind].tail(5).tolist()
                 if len(last_vals) == 5 and all(pd.notnull(last_vals)):
@@ -58,12 +58,19 @@ def get_llm_analysis(symbol, current_price, recent_history_df, news_df, past_tra
     # Prepare news headlines string
     news_str = ""
     if not news_df.empty:
-        news_str = "\n".join([f"- {row['title']} (Source: {row.get('source','N/A')})" for index, row in news_df.iterrows()])
+        # Patch: handle both 'title'/'description' and 'headline'/'summary'
+        title_col = 'title' if 'title' in news_df.columns else 'headline'
+        desc_col = 'description' if 'description' in news_df.columns else 'summary'
+        for col in [title_col, desc_col]:
+            if col not in news_df.columns:
+                news_df[col] = ''
+        news_str = "\n".join([f"- {row[title_col]} (Source: {row.get('source','N/A')})" for index, row in news_df.iterrows()])
 
     # Add a summary of the most recent news headline for LLM prompt clarity
     if not news_df.empty:
         latest_news = news_df.iloc[0]
-        news_str += f"\n\nMost recent headline: {latest_news['title']} (Published: {latest_news.get('created_at', 'N/A')})"
+        latest_title = latest_news[title_col] if title_col in latest_news else ''
+        news_str += f"\n\nMost recent headline: {latest_title} (Published: {latest_news.get('created_at', 'N/A')})"
 
     # --- LLM Prompt Improvements ---
     prompt = prompt_template.format(
